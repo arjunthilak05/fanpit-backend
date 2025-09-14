@@ -1,19 +1,14 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ConfigService } from '@nestjs/config';
-import helmet from 'helmet';
-import * as compression from 'compression';
-import * as cookieParser from 'cookie-parser';
-
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { GlobalAuthGuard } from './common/guards/global-auth.guard';
+import cookieParser from 'cookie-parser';
+import compression from 'compression';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
   // Security middleware
@@ -21,59 +16,56 @@ async function bootstrap() {
   app.use(compression());
   app.use(cookieParser());
 
-  // Global prefix
-  app.setGlobalPrefix('api/v1');
+  // Global validation pipe
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transformOptions: {
+      enableImplicitConversion: true,
+    },
+  }));
 
   // CORS configuration
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'http://localhost:3002',
+    'https://fanpit-frontend.vercel.app'
+  ];
+  
   app.enableCors({
-    origin: [
-      configService.get<string>('FRONTEND_URL', 'http://localhost:3000'),
-      'http://localhost:3000',
-      'http://localhost:3002',
-      'https://fanpit.vercel.app'
-    ],
+    origin: allowedOrigins,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
-  // Global pipes, filters, and interceptors
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
+  // Global guards
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(new GlobalAuthGuard(reflector));
 
-  app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new TransformInterceptor(), new LoggingInterceptor());
+  // Global API prefix
+  app.setGlobalPrefix('api/v1');
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('Fanpit API')
-    .setDescription('Space booking platform API documentation')
+    .setTitle('Fanpit Space Booking Platform API')
+    .setDescription('Production-ready API for space booking platform with comprehensive features')
     .setVersion('1.0')
     .addBearerAuth(
       {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Enter JWT token',
-        in: 'header',
       },
-      'JWT-auth',
+      'access-token',
     )
-    .addTag('Auth', 'Authentication endpoints')
-    .addTag('Users', 'User management endpoints')
-    .addTag('Spaces', 'Space management endpoints')
-    .addTag('Bookings', 'Booking management endpoints')
-    .addTag('Payments', 'Payment processing endpoints')
-    .addTag('Staff', 'Staff dashboard endpoints')
+    .addTag('Authentication', 'User authentication and authorization')
+    .addTag('Spaces', 'Space management for brand owners')
+    .addTag('Bookings', 'Reservation and booking management')
+    .addTag('Payments', 'Payment processing with Razorpay')
+    .addTag('Staff', 'Staff dashboard for check-ins/check-outs')
+    .addTag('Analytics', 'Analytics and reporting for brand owners')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -83,11 +75,16 @@ async function bootstrap() {
     },
   });
 
-  const port = configService.get<number>('PORT', 3001);
+  const port = process.env.PORT || 3001;
   await app.listen(port);
   
-  logger.log(`🚀 Fanpit Backend API is running on: http://localhost:${port}/api/v1`);
-  logger.log(`📚 Swagger documentation: http://localhost:${port}/api/docs`);
+  logger.log(`🚀 Application is running on: ${await app.getUrl()}`);
+  logger.log(`📚 Swagger docs available at: ${await app.getUrl()}/api/docs`);
+  logger.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.log(`🔗 Allowed origins: ${allowedOrigins.join(', ')}`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Application failed to start:', error);
+  process.exit(1);
+});
