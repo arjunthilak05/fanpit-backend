@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: fanpit-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        fromDatabase:
+          name: fanpit-mongodb
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 1h
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        value: https://your-frontend-app.vercel.app
+      - key: RAZORPAY_KEY_ID
+        value: rzp_test_RHCtm0tnz9yjuE
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+databases:
+  - name: fanpit-mongodb
+    plan: free
