@@ -2,6 +2,13 @@
 
 Production-ready NestJS backend for the Fanpit space booking platform with complete implementation of all assignment requirements.
 
+
+https://fanpit-backend-yf2t.onrender.com
+
+https://fanpit-frontend-kappa.vercel.app/
+
+
+
 ## 🚀 Assignment Implementation Status
 
 ✅ **All Core Requirements Implemented**
