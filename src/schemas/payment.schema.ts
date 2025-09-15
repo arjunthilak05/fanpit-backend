@@ -30,11 +30,11 @@ export interface RefundDetails {
 
 @Schema({ timestamps: true })
 export class Payment {
-  @Prop({ type: Types.ObjectId, ref: 'Booking', required: true })
-  bookingId: Types.ObjectId;
+  @Prop({ required: true })
+  bookingId: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  userId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  userId?: Types.ObjectId;
 
   @Prop({ required: true })
   razorpayOrderId: string;

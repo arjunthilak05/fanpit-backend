@@ -6,6 +6,8 @@ import { GlobalAuthGuard } from './common/guards/global-auth.guard';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import helmet from 'helmet';
+import { join } from 'path';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -46,6 +48,9 @@ async function bootstrap() {
 
   // Global API prefix
   app.setGlobalPrefix('api/v1');
+
+  // Serve static files from uploads directory
+  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
   // Swagger documentation
   const config = new DocumentBuilder()

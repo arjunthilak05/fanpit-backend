@@ -1,12 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3003;
 
 // Get allowed origins from environment or use defaults
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:3000', 'http://localhost:3002'];
+  : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
 
 // Middleware
 app.use(cors({
@@ -143,6 +143,64 @@ app.get('/', (req, res) => {
   });
 });
 
+// Payment endpoints
+app.post('/api/v1/payments/create-order', (req, res) => {
+  try {
+    const { bookingId, amount, currency = 'INR', customerDetails } = req.body;
+    
+    // Simulate Razorpay order creation
+    const order = {
+      orderId: `order_demo_${Date.now()}`,
+      amount: amount * 100, // Convert to paise
+      currency,
+      key: process.env.RAZORPAY_KEY || 'rzp_test_RHCtm0tnz9yjuE'
+    };
+    
+    console.log('Demo order created:', order);
+    
+    res.json({
+      success: true,
+      data: order,
+      message: 'Order created successfully (demo mode)'
+    });
+  } catch (error) {
+    console.error('Order creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create order'
+    });
+  }
+});
+
+app.post('/api/v1/payments/verify', (req, res) => {
+  try {
+    const { orderId, paymentId, signature, bookingId } = req.body;
+    
+    // Always verify as successful in demo mode
+    const verificationResult = {
+      verified: true,
+      booking: {
+        id: bookingId,
+        bookingCode: `FP${Date.now().toString().slice(-6)}`
+      }
+    };
+    
+    console.log('Demo payment verified:', paymentId);
+    
+    res.json({
+      success: true,
+      data: verificationResult,
+      message: 'Payment verified successfully (demo mode)'
+    });
+  } catch (error) {
+    console.error('Payment verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify payment'
+    });
+  }
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Global error handler:', err);
@@ -162,9 +220,29 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+// Error handling
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+const server = app.listen(PORT, () => {
   console.log(`🚀 Fanpit Backend API running on port ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/api/v1/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Allowed origins: ${allowedOrigins.join(', ')}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Please use a different port.`);
+  } else {
+    console.error('Server error:', err);
+  }
+  process.exit(1);
 });

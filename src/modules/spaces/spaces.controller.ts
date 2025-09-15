@@ -1,14 +1,18 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Body, 
-  Param, 
-  Query, 
-  UseGuards 
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  UploadedFiles,
+  UseInterceptors
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { SpacesService } from './spaces.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -16,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { UserRole } from '../../schemas/user.schema';
+import * as multer from 'multer';
 
 @ApiTags('Spaces')
 @Controller('spaces')
@@ -104,5 +109,72 @@ export class SpacesController {
       availabilityDto.endTime,
     );
     return { success: true, ...availability };
+  }
+
+  @Post(':id/images')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.BRAND_OWNER, UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Upload images for a space' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('images', 10, {
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB per file
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed!'), false);
+      }
+    },
+  }))
+  async uploadImages(
+    @Param('id') spaceId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.spacesService.uploadImages(spaceId, files, user._id);
+    return { success: true, ...result };
+  }
+
+  @Delete(':id/images/:imageIndex')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.BRAND_OWNER, UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Delete a specific image from a space' })
+  async deleteImage(
+    @Param('id') spaceId: string,
+    @Param('imageIndex') imageIndex: string,
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.spacesService.deleteImage(spaceId, parseInt(imageIndex), user._id);
+    return { success: true, ...result };
+  }
+
+  @Post('upload/avatar')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Upload user avatar' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('avatar', 1, {
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 2 * 1024 * 1024, // 2MB per file
+    },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed!'), false);
+      }
+    },
+  }))
+  async uploadAvatar(
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.spacesService.uploadAvatar(user._id, files[0]);
+    return { success: true, ...result };
   }
 }
